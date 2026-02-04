@@ -1,9 +1,8 @@
 # Windows-Handle-Finder
----
 一个能修改窗口的工具！
 适用于 Windows 10-11 的可执行应用程序。
 发布页面：[单击打开](http://www.yeskunkun.cn/news/?210.html)
-****
+
 这是一个轻量的小工具，能够使用`SetWindowLongPtrW`函数修改任何窗口的属性。
 ****
 ## 目录（政治三大设问角度）
