@@ -650,10 +650,6 @@ int main() {
 		pSetMode = (SetPreferredAppModeProc)GetProcAddress(LoadLibraryExW(L"uxtheme.dll", 0, 2048), MAKEINTRESOURCEA(136));
 		pSetMode(true);
 	}
-	typedef void (*AddFunc)();
-	HMODULE hDll = LoadLibraryW(L"E:\\desktop\\cpps\\DarkMagicX64.dll");
-	AddFunc pAdd = (AddFunc)GetProcAddress(hDll, "InitDarkMagic");
-	pAdd();
 	HWND hwnd = CreateWindowExW(257, L"#32770", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	SetWindowLongPtrW(hwnd, -4, (long long)(WNDPROC([](HWND hwnd, unsigned int msg, WPARAM wparam, LPARAM lparam)->LRESULT {
 		switch (msg) {
@@ -1026,4 +1022,5 @@ int main() {
 }
 int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd) {
 	return main();
+
 }
