@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include <dwmapi.h>
 #include <iostream>
 #include <string>
@@ -10,6 +10,8 @@
 #include <ShlObj.h>
 #include <winternl.h>
 #include <VersionHelpers.h>
+#include <cstdio>
+#include <string_view>
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "Uxtheme.lib")
 #pragma comment(lib, "comctl32.lib")
@@ -19,11 +21,10 @@
 using namespace std;
 BOOL tmp;
 HMENU hmenu;
-HWND parenthwnd, childhwnd;
 POINT pt;
 RECT rcMsgBox;
-int style_ = 0, havehandle = 0, lastanswer = 0, isDarkThemeEnabled = false, DarkModeBGR = 0xF0F0F0;
-HWND hmenuwnd, hwnd_;
+int style_ = 0, havehandle = 0, lastanswer = 0, isDarkThemeEnabled = false, DarkModeBGR = 0xF0F0F0, thickness = 6;
+HWND parenthwnd, childhwnd,hmenuwnd, hwnd_,hprev,hborder,htip;
 HBRUSH hBrush = CreateSolidBrush(RGB(240, 240, 240));
 COLORREF bgColor = RGB(242, 247, 250);
 COLORREF textColor = RGB(0, 0, 0);
@@ -32,9 +33,9 @@ COLORREF hoverColor = RGB(200, 222, 255);
 COLORREF disabledColor = RGB(150, 150, 150);
 COLORREF borderColor = RGB(255, 255, 255);
 COLORREF darkBorderColor = RGB(225, 225, 225);
-HHOOK g_hHook;
+HHOOK g_hHook, hmshook, hkbhook;
+HFONT TipFont = CreateFontA(18, 0, 0, 0, FW_NORMAL, 0, 0, 0, 1, 0, 0, 0, 0, "微软雅黑");
 wstring message_, title_;
-int preference = true;
 WNDPROC originalProc, originalbtnProc;
 LPCWSTR attributes_name[] = { L"WS_OVERLAPPED",
 L"WS_POPUP",
@@ -267,7 +268,7 @@ void log(const wchar_t* str, bool nl = true) {
 	SYSTEMTIME tm;
 	GetLocalTime(&tm);
 	wcout << '[' << tm.wYear << '-' << tm.wMonth << '-' << tm.wDay << ' ' <<
-		tm.wHour << ':' << tm.wMinute << ':' << tm.wSecond << ',' << tm.wMilliseconds << "] " << str << (nl ? "\n" : "");
+		tm.wHour << ':' << tm.wMinute << ':' << tm.wSecond << '.' << tm.wMilliseconds << "] " << str << (nl ? "\n" : "");
 }
 bool CopyText(const std::wstring& text) {
 	log((L"Coping Text: " + text).c_str());
@@ -359,8 +360,6 @@ HWND ShowMessageBoxThread(HWND hwnd, const wchar_t* message, LPCWSTR title, int 
 			return (INT_PTR)hBrush;
 		}
 		case WM_SETTINGCHANGE: {
-			DwmSetWindowAttribute(hwnd, 1029, &preference, sizeof(preference));
-
 			HKEY hKey;
 			DWORD valueSize = sizeof(DWORD);
 			RegOpenKeyExW(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0, KEY_READ, &hKey);
@@ -640,15 +639,125 @@ DWORD PrepareForUIAccess() {
 	}
 	return dwErr;
 }
+// 在窗口上绘制透明红色边框
+void DrawWindowOutline(HWND hwnd, COLORREF color) {
+    if (hborder && IsWindow(hborder)) DestroyWindow(hborder);
+    RECT rect;
+    GetWindowRect(hwnd, &rect);
+    int w = rect.right - rect.left + thickness * 2;
+    int h = rect.bottom - rect.top + thickness * 2;
+    hborder = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, L"STATIC", 0, WS_POPUP | WS_VISIBLE,rect.left, rect.top, w, h, 0, 0, GetModuleHandleW(0), 0);
+    SetWindowLongPtrW(hborder, GWLP_USERDATA, (LONG_PTR)color);
+    SetWindowLongPtrW(hborder, GWLP_WNDPROC, LONG_PTR(WNDPROC([](HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
+        switch (msg) {
+        case WM_PAINT: {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(hwnd, &ps);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HBRUSH hWhite = CreateSolidBrush(RGB(255, 255, 255));
+            FillRect(hdc, &rc, hWhite);
+            DeleteObject(hWhite);
+            COLORREF col = (COLORREF)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            HBRUSH hBorder = CreateSolidBrush(col);
+			rc.left += thickness/2;
+			rc.top += thickness/2;
+			rc.right -= thickness/2;
+			rc.bottom -= thickness/2;
+            RECT rtop = { rc.left, rc.top, rc.right, rc.top + thickness };
+            FillRect(hdc, &rtop, hBorder);
+            RECT rbot = { rc.left, rc.bottom - thickness, rc.right, rc.bottom };
+            FillRect(hdc, &rbot, hBorder);
+            RECT rleft = { rc.left, rc.top, rc.left + thickness, rc.bottom };
+            FillRect(hdc, &rleft, hBorder);
+            RECT rright = { rc.right - thickness, rc.top, rc.right, rc.bottom };
+            FillRect(hdc, &rright, hBorder);
+            DeleteObject(hBorder);
+            EndPaint(hwnd, &ps);
+            return 0;
+        }
+        case WM_ERASEBKGND: {
+            return 1;
+        }
+        }
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
+    })));
+    SetWindowPos(hborder, HWND_TOPMOST, rect.left - thickness, rect.top - thickness, w, h, SWP_SHOWWINDOW);
+	SetLayeredWindowAttributes(hborder, 0xFFFFFF, 0, LWA_COLORKEY);
+    //InvalidateRect(hborder, NULL, TRUE);
+}
+int GetTextHeight(HFONT hFont, LPCWSTR text) {
+    RECT rect = { 0, 0, 680, 0 };
+    HDC hdc = GetDC(GetDesktopWindow());
+    if (!hdc) return 0;
+    HFONT hOld = (HFONT)SelectObject(hdc, hFont);
+    DrawTextW(hdc, text, -1, &rect, DT_CALCRECT | DT_WORDBREAK | DT_LEFT | DT_TOP);
+    SelectObject(hdc, hOld);
+    ReleaseDC(GetDesktopWindow(), hdc);
+    return (rect.bottom - rect.top)+4;
+}
+int GetTextWidth(HFONT hFont, LPCWSTR text) {
+    RECT rect = { 0, 0, 680, 0 };
+    HDC hdc = GetDC(GetDesktopWindow());
+    if (!hdc) return 0;
+    HFONT hOld = (HFONT)SelectObject(hdc, hFont);
+    DrawTextW(hdc, text, -1, &rect, DT_CALCRECT | DT_WORDBREAK | DT_LEFT | DT_TOP);
+    SelectObject(hdc, hOld);
+    ReleaseDC(GetDesktopWindow(), hdc);
+    return (rect.right - rect.left)+6;
+}
+BOOL AppendWideString(WCHAR* pBuffer, size_t bufferSize, const WCHAR* pFormat, ...)
+{
+	// 参数合法性检查
+	if (pBuffer == nullptr || bufferSize == 0 || pFormat == nullptr)
+	{
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return FALSE;
+	}
+
+	// 1. 获取原有字符串长度
+	size_t currentLength = wcslen(pBuffer);
+
+	// 检查缓冲区剩余空间是否足够（至少留1个位置给终止符）
+	if (currentLength >= bufferSize - 1)
+	{
+		SetLastError(ERROR_INSUFFICIENT_BUFFER);
+		return FALSE;
+	}
+
+	// 2. 准备可变参数列表
+	va_list args;
+	va_start(args, pFormat);
+
+	// 3. 从当前字符串末尾开始追加内容
+	// swprintf_s返回实际写入的字符数（不含终止符），失败返回-1
+	int written = _vsnwprintf_s(
+		pBuffer + currentLength,      // 写入起始位置（原有字符串末尾）
+		bufferSize - currentLength,   // 剩余可用缓冲区大小
+		_TRUNCATE,                    // 超出时截断（可选，也可直接限制长度）
+		pFormat,                      // 格式化字符串
+		args                          // 可变参数
+	);
+
+	va_end(args);
+
+	// 检查写入是否成功
+	if (written < 0)
+	{
+		SetLastError(ERROR_INVALID_DATA);
+		return FALSE;
+	}
+
+	return TRUE;
+}
 int main() {
+	SetThemeAppProperties(STAP_ALLOW_NONCLIENT | STAP_ALLOW_WEBCONTENT | STAP_ALLOW_CONTROLS);
 	MSG msg;
-	ios::sync_with_stdio(false);
+	basic_ios<char, char_traits<char>>::sync_with_stdio(false);
 	if (true) {
 		typedef int(__stdcall* SetPreferredAppModeProc)(int);
-		SetPreferredAppModeProc pSetMode = (SetPreferredAppModeProc)GetProcAddress(LoadLibraryExW(L"uxtheme.dll", 0, 2048), MAKEINTRESOURCEA(135));
-		pSetMode(true);
-		pSetMode = (SetPreferredAppModeProc)GetProcAddress(LoadLibraryExW(L"uxtheme.dll", 0, 2048), MAKEINTRESOURCEA(136));
-		pSetMode(true);
+		SetPreferredAppModeProc SetPreferredAppMode = (SetPreferredAppModeProc)GetProcAddress(LoadLibraryExW(L"uxtheme.dll", 0, 2048), MAKEINTRESOURCEA(135));
+		SetPreferredAppMode(true);
 	}
 	HWND hwnd = CreateWindowExW(257, L"#32770", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	SetWindowLongPtrW(hwnd, -4, (long long)(WNDPROC([](HWND hwnd, unsigned int msg, WPARAM wparam, LPARAM lparam)->LRESULT {
@@ -665,7 +774,9 @@ int main() {
 				AppendMenuW(hmenu, MF_STRING, 0, L"野生坤坤没头像制作。");
 				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
 				AppendMenuW(hmenu, MF_STRING, 0xF000, L"退出");
+				SetThemeAppProperties(0);
 				TrackPopupMenu(hmenu, TPM_BOTTOMALIGN | TPM_LEFTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+				SetThemeAppProperties(STAP_ALLOW_NONCLIENT | STAP_ALLOW_WEBCONTENT | STAP_ALLOW_CONTROLS);
 			}
 			break;
 		}
@@ -1000,6 +1111,85 @@ int main() {
 		log(L"Program exit.");
 		return 0;
 	}
+	htip = CreateWindowExW(WS_EX_NOACTIVATE|WS_EX_TOPMOST, L"STATIC", 0, WS_POPUP | WS_BORDER | SS_CENTER, 0, 0, 100, 50, 0, 0, GetModuleHandleW(0), 0);
+	SendMessageW(htip, WM_SETFONT, WPARAM(TipFont), 1);
+	hmshook = SetWindowsHookExW(WH_MOUSE_LL, [](int nCode, WPARAM wParam, LPARAM lParam) {
+		if (nCode >= 0) {
+			//		if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+			//			if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+			//				POINT pt;
+			//				GetCursorPos(&pt);
+			//				//SetWindowPos(htip, HWND_TOPMOST, pt.x + 20, pt.y + 20, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE);
+			//				HWND hCur = WindowFromPoint(pt);
+			//				//log((L"HWND: "+to_wstring(int(hCur))+L" TITLE: "+wstring(title)).c_str());
+			//				if (hCur != hprev) {
+			//					hprev = hCur;
+			//					DrawWindowOutline(hCur, RGB(255, 0, 0));
+			//				}
+			//			}
+			//		}
+			//		else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
+			//			if (!((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000))) {
+			//				SetWindowPos(htip, HWND_BOTTOM, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOMOVE);
+			//				if (hborder && IsWindow(hborder)) {
+			//					DestroyWindow(hborder);
+			//					hborder = NULL;
+			//				}
+			//				hprev = NULL;
+			//			}
+			//		}
+			if ((GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_SHIFT) & 0x8000)) {
+				POINT pt;
+				GetCursorPos(&pt);
+
+				//SetWindowPos(htip, HWND_TOPMOST, pt.x + 20, pt.y + 20, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE);
+				HWND hCur = WindowFromPoint(pt);
+				//log((L"HWND: "+to_wstring(int(hCur))+L" TITLE: "+wstring(title)).c_str());
+				if (hCur != hprev) {
+					hprev = hCur;
+					DrawWindowOutline(hCur, RGB(255, 0, 0));
+				}
+				MSLLHOOKSTRUCT* ms = (MSLLHOOKSTRUCT*)lParam;
+				wchar_t buf[1024];
+				swprintf_s(buf, 1024, L"句柄：%d", int(hCur));
+				wchar_t title[33]{};
+				GetWindowTextW(hCur, title, 33);
+				AppendWideString(buf, 1024, L"\r\n标题：");
+				if (wstring(title).size() >= 32) {
+					title[32] = 0;
+					buf[wcslen(buf)] = 0;
+					wcscat_s(buf, title);
+					wcscat_s(buf, L"...");
+				}
+				else {
+					wcscat_s(buf, title);
+				}
+				AppendWideString(buf, 1024, L"\r\n类：");
+				GetClassNameW(hCur, title, 33);
+				AppendWideString(buf, 1024, title);
+				AppendWideString(buf, 1024, L"\r\n样式：%d\r\n矩形：(", GetWindowLongPtrW(hCur, -16));
+				RECT rc;
+				GetWindowRect(hCur, &rc);
+				AppendWideString(buf, 1024, L"%d, %d)-(%d, %d) %dx%d", rc.left, rc.top, rc.right, rc.bottom, rc.right - rc.left, rc.bottom - rc.top);
+				SetWindowTextW(htip, buf);
+				int w = GetTextWidth(TipFont, buf), h = GetTextHeight(TipFont, buf), x = ms->pt.x + 20, y = ms->pt.y + 20;
+				if (ms->pt.x + w + 20 > GetSystemMetrics(SM_CXSCREEN)) {
+					x -= w + 40;
+				}
+				if (ms->pt.y + h + 20 > GetSystemMetrics(SM_CYSCREEN)) {
+					y -= h + 40;
+				}
+				SetWindowPos(htip, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW);
+			} else {
+				ShowWindow(htip, SW_HIDE);
+				if (hborder && IsWindow(hborder)) {
+					DestroyWindow(hborder);
+					hborder = NULL;
+				}
+				hprev = NULL;
+			}
+		}
+		return CallNextHookEx(hmshook, nCode, wParam, lParam);}, 0, 0);
 	NOTIFYICONDATAW nid = { 0 };
 	nid.cbSize = sizeof(NOTIFYICONDATAW);
 	nid.hWnd = hwnd;
@@ -1022,5 +1212,4 @@ int main() {
 }
 int WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd) {
 	return main();
-
 }
