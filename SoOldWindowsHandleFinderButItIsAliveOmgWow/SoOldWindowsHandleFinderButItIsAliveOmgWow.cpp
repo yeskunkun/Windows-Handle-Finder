@@ -1,4 +1,4 @@
-#include <windows.h>
+﻿#include <windows.h>
 #include <dwmapi.h>
 #include <iostream>
 #include <string>
@@ -682,7 +682,7 @@ void DrawWindowOutline(HWND hwnd, COLORREF color) {
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     })));
-    SetWindowPos(hborder, HWND_TOPMOST, rect.left - thickness, rect.top - thickness, w, h, SWP_SHOWWINDOW);
+    SetWindowPos(hborder, HWND_TOPMOST, rect.left - thickness, rect.top - thickness, w, h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
 	SetLayeredWindowAttributes(hborder, 0xFFFFFF, 0, LWA_COLORKEY);
     //InvalidateRect(hborder, NULL, TRUE);
 }
@@ -706,8 +706,7 @@ int GetTextWidth(HFONT hFont, LPCWSTR text) {
     ReleaseDC(GetDesktopWindow(), hdc);
     return (rect.right - rect.left)+6;
 }
-BOOL AppendWideString(WCHAR* pBuffer, size_t bufferSize, const WCHAR* pFormat, ...)
-{
+BOOL AppendWideString(WCHAR* pBuffer, size_t bufferSize, const WCHAR* pFormat, ...) {
 	// 参数合法性检查
 	if (pBuffer == nullptr || bufferSize == 0 || pFormat == nullptr)
 	{
@@ -751,7 +750,6 @@ BOOL AppendWideString(WCHAR* pBuffer, size_t bufferSize, const WCHAR* pFormat, .
 	return TRUE;
 }
 int main() {
-	SetThemeAppProperties(STAP_ALLOW_NONCLIENT | STAP_ALLOW_WEBCONTENT | STAP_ALLOW_CONTROLS);
 	MSG msg;
 	basic_ios<char, char_traits<char>>::sync_with_stdio(false);
 	if (true) {
@@ -774,9 +772,8 @@ int main() {
 				AppendMenuW(hmenu, MF_STRING, 0, L"野生坤坤没头像制作。");
 				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
 				AppendMenuW(hmenu, MF_STRING, 0xF000, L"退出");
-				SetThemeAppProperties(0);
+				SetFocus(hwnd);
 				TrackPopupMenu(hmenu, TPM_BOTTOMALIGN | TPM_LEFTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
-				SetThemeAppProperties(STAP_ALLOW_NONCLIENT | STAP_ALLOW_WEBCONTENT | STAP_ALLOW_CONTROLS);
 			}
 			break;
 		}
@@ -879,7 +876,7 @@ int main() {
 				AppendMenuW(hmenu, MF_POPUP, LONG_PTR(thmenu), L"更多 Windows 工具. . . ");
 				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
 				AppendMenuW(hmenu, MF_STRING, 0, L"退出菜单");
-				HWND tmph = CreateWindowExW(0, L"#32770", 0, 0, 0, 0, 0, 0, GetForegroundWindow(), 0, 0, 0);
+				HWND hold = GetFocus(), tmph = CreateWindowExW(WS_EX_NOACTIVATE, L"#32770", 0, WS_CHILD, 0, 0, 0, 0, GetForegroundWindow(), 0, 0, 0);
 				SetWindowLongPtrW(tmph, -4, LONG_PTR(WNDPROC([](HWND hwnd, unsigned int msg, WPARAM wparam, LPARAM lparam) -> LRESULT {
 					switch (msg) {
 					case WM_MEASUREITEM: {
@@ -1092,7 +1089,9 @@ int main() {
 					return DefWindowProcW(hwnd, msg, wparam, lparam);
 					})));
 				GetCursorPos(&pt);
+				SetFocus(tmph);
 				TrackPopupMenu(hmenu, 0, pt.x, pt.y, 0, tmph, 0);
+				SetFocus(hold);
 			}
 			break;
 		}
@@ -1115,33 +1114,9 @@ int main() {
 	SendMessageW(htip, WM_SETFONT, WPARAM(TipFont), 1);
 	hmshook = SetWindowsHookExW(WH_MOUSE_LL, [](int nCode, WPARAM wParam, LPARAM lParam) {
 		if (nCode >= 0) {
-			//		if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-			//			if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
-			//				POINT pt;
-			//				GetCursorPos(&pt);
-			//				//SetWindowPos(htip, HWND_TOPMOST, pt.x + 20, pt.y + 20, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE);
-			//				HWND hCur = WindowFromPoint(pt);
-			//				//log((L"HWND: "+to_wstring(int(hCur))+L" TITLE: "+wstring(title)).c_str());
-			//				if (hCur != hprev) {
-			//					hprev = hCur;
-			//					DrawWindowOutline(hCur, RGB(255, 0, 0));
-			//				}
-			//			}
-			//		}
-			//		else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
-			//			if (!((GetAsyncKeyState(VK_CONTROL) & 0x8000) && (GetAsyncKeyState(VK_SHIFT) & 0x8000))) {
-			//				SetWindowPos(htip, HWND_BOTTOM, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOSIZE | SWP_NOMOVE);
-			//				if (hborder && IsWindow(hborder)) {
-			//					DestroyWindow(hborder);
-			//					hborder = NULL;
-			//				}
-			//				hprev = NULL;
-			//			}
-			//		}
 			if ((GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_SHIFT) & 0x8000)) {
 				POINT pt;
 				GetCursorPos(&pt);
-
 				//SetWindowPos(htip, HWND_TOPMOST, pt.x + 20, pt.y + 20, 0, 0, SWP_SHOWWINDOW | SWP_NOSIZE);
 				HWND hCur = WindowFromPoint(pt);
 				//log((L"HWND: "+to_wstring(int(hCur))+L" TITLE: "+wstring(title)).c_str());
@@ -1179,7 +1154,7 @@ int main() {
 				if (ms->pt.y + h + 20 > GetSystemMetrics(SM_CYSCREEN)) {
 					y -= h + 40;
 				}
-				SetWindowPos(htip, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW);
+				SetWindowPos(htip, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW|SWP_NOACTIVATE);
 			} else {
 				ShowWindow(htip, SW_HIDE);
 				if (hborder && IsWindow(hborder)) {
