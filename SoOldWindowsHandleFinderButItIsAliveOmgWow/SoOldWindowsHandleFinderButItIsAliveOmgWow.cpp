@@ -24,7 +24,7 @@ HMENU hmenu;
 POINT pt;
 RECT rcMsgBox;
 int style_ = 0, havehandle = 0, lastanswer = 0, isDarkThemeEnabled = false, DarkModeBGR = 0xF0F0F0, thickness = 6;
-HWND parenthwnd, childhwnd,hmenuwnd, hwnd_,hprev,hborder,htip;
+HWND parenthwnd, childhwnd,hmenuwnd, hwnd_,hprev,hborder,htip, hMenuTipWnd;
 HBRUSH hBrush = CreateSolidBrush(RGB(240, 240, 240));
 COLORREF bgColor = RGB(242, 247, 250);
 COLORREF textColor = RGB(0, 0, 0);
@@ -35,8 +35,217 @@ COLORREF borderColor = RGB(255, 255, 255);
 COLORREF darkBorderColor = RGB(225, 225, 225);
 HHOOK g_hHook, hmshook, hkbhook;
 HFONT TipFont = CreateFontA(18, 0, 0, 0, FW_NORMAL, 0, 0, 0, 1, 0, 0, 0, 0, "微软雅黑");
+HFONT MenuTipFont = CreateFontA(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, 1, 0, 0, 0, 0, "微软雅黑");
 wstring message_, title_;
-WNDPROC originalProc, originalbtnProc;
+WNDPROC originalProc, originalbtnProc, oldMenuTipProc;
+UINT_PTR g_menuTipTimerId = 0;
+UINT g_lastHoverCmd = (UINT)-1;
+bool g_menuActive = false;
+// 菜单 Tooltip 数据结构
+struct MenuTooltipEntry {
+    UINT cmdLow;    // 命令 ID 范围起始
+    UINT cmdHigh;   // 命令 ID 范围结束（包含）
+    LPCWSTR tooltip;
+};
+// 单个命令 ID 的 Tooltip 查找
+LPCWSTR FindTooltipByCmd(UINT cmd) {
+    // 窗口属性（添加：0xF0000000-0xF0000035，移除：0xB0000000-0xB0000035）
+    if (cmd >= 0xF0000000 && cmd <= 0xF0000035) {
+        static LPCWSTR attrTooltipsAdd[] = {
+            L"WS_OVERLAPPED：重叠窗口样式，具有标题栏和可调整边框的标准顶层窗口。这是最基本的窗口样式，通常与 WS_CAPTION、WS_SYSMENU、WS_THICKFRAME、WS_MINIMIZEBOX、WS_MAXIMIZEBOX 组合使用。",
+            L"WS_POPUP：弹出式窗口样式，无标题栏和边框，常用于对话框、消息框和右键菜单。弹出窗口不能单独作为子窗口，但可以包含子控件。",
+            L"WS_CHILD：子窗口样式，必须有一个父窗口，显示在父窗口客户区内，跟随父窗口移动。子窗口不能有菜单栏，且坐标相对于父窗口客户区。",
+            L"WS_MINIMIZE：窗口初始为最小化状态（图标化）。创建后窗口会缩小到任务栏。等同于 WS_ICONIC。",
+            L"WS_VISIBLE：窗口初始为可见状态。创建后立即显示在屏幕上。如果未设置此样式，窗口创建后是隐藏的，需要调用 ShowWindow 显示。",
+            L"WS_DISABLED：窗口初始为禁用状态，无法接收用户输入（鼠标、键盘）。禁用的控件会显示为灰色，常用于保护某些操作条件不满足时的功能。",
+            L"WS_CLIPSIBLINGS：裁剪子窗口相对位置，当两个子窗口重叠时，被覆盖的子窗口不会在重叠区域绘制。仅用于 WS_CHILD 窗口。",
+            L"WS_CLIPCHILDREN：在父窗口绘制时自动排除子窗口占据的区域，避免父窗口绘制覆盖子窗口。常用于容器类窗口。",
+            L"WS_MAXIMIZE：窗口初始为最大化状态。创建后窗口会扩展到全屏（不含任务栏区域）。",
+            L"WS_CAPTION：窗口具有标题栏，包含 WS_BORDER 样式。标题栏显示窗口标题文本，并支持拖拽移动窗口。",
+            L"WS_BORDER：窗口具有细线边框，窗口大小不可调整。常用于对话框和固定大小的窗口。",
+            L"WS_DLGFRAME：窗口具有对话框风格的边框，无标题栏。常用于模态对话框。",
+            L"WS_VSCROLL：窗口具有垂直滚动条，允许用户滚动查看超出显示区域的内容。常用于文本编辑器和列表视图。",
+            L"WS_HSCROLL：窗口具有水平滚动条，允许用户水平滚动查看内容。常与 WS_VSCROLL 配合使用。",
+            L"WS_SYSMENU：窗口标题栏包含系统菜单按钮（左上角图标），点击后显示还原/移动/大小/最小化/最大化/关闭等选项。",
+            L"WS_THICKFRAME：窗口具有可调整大小的厚边框，用户可以用鼠标拖拽边框改变窗口大小。等同于 WS_SIZEBOX。",
+            L"WS_GROUP：标记控件组的第一个控件，用于键盘方向键导航。按方向键时在同一组内切换焦点。",
+            L"WS_TABSTOP：标记控件可用 Tab 键切换焦点。用户按 Tab 键时焦点会在设置了 WS_TABSTOP 的控件间循环。",
+            L"WS_MINIMIZEBOX：窗口标题栏包含最小化按钮，点击后将窗口缩小到任务栏。需要 WS_SYSMENU 样式才能生效。",
+            L"WS_MAXIMIZEBOX：窗口标题栏包含最大化按钮，点击后将窗口扩展到全屏。需要 WS_SYSMENU 样式才能生效。",
+            L"WS_TILED：与 WS_OVERLAPPED 相同，重叠窗口样式。",
+            L"WS_ICONIC：与 WS_MINIMIZE 相同，窗口初始为最小化状态。",
+            L"WS_SIZEBOX：与 WS_THICKFRAME 相同，窗口具有可调整大小的边框。",
+            L"WS_TILEDWINDOW：与 WS_OVERLAPPEDWINDOW 相同，标准重叠窗口的完整组合。",
+            L"WS_OVERLAPPEDWINDOW：标准重叠窗口的完整组合样式，包含 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX。这是大多数应用程序主窗口使用的样式。",
+            L"WS_POPUPWINDOW：弹出窗口的完整组合样式，包含 WS_POPUP | WS_BORDER | WS_SYSMENU。常用于右键菜单和临时对话框。",
+            L"WS_CHILDWINDOW：与 WS_CHILD 相同，子窗口样式。",
+            L"WS_EX_DLGMODALFRAME：对话框模态边框扩展样式，窗口具有双边框，常用于模态对话框。",
+            L"WS_EX_NOPARENTNOTIFY：子窗口创建或销毁时不发送 WM_PARENTNOTIFY 消息给父窗口。",
+            L"WS_EX_TOPMOST：窗口始终置顶显示，即使失去焦点也保持在其他窗口之上。常用于浮动工具栏和通知窗口。",
+            L"WS_EX_ACCEPTFILES：窗口接受拖放文件，用户可以从资源管理器拖拽文件到该窗口。",
+            L"WS_EX_TRANSPARENT：透明窗口，鼠标点击穿透到底层窗口。窗口自身仍可绘制内容，但不拦截鼠标事件。",
+            L"WS_EX_MDICHILD：MDI（多文档界面）子窗口，用于在 MDI 父窗口内创建多个文档子窗口。",
+            L"WS_EX_TOOLWINDOW：工具窗口，标题栏较窄（使用小字体），不在任务栏显示，Alt+Tab 切换中不可见。常用于浮动工具栏。",
+            L"WS_EX_WINDOWEDGE：窗口具有凸起的边框边缘，使窗口看起来有立体感。",
+            L"WS_EX_CLIENTEDGE：窗口客户区具有凹陷的边缘，使客户区看起来是下沉的。常用于可编辑区域。",
+            L"WS_EX_CONTEXTHELP：窗口标题栏包含问号（？）帮助按钮，点击后鼠标变为问号，再点击控件会收到 WM_HELP 消息。",
+            L"WS_EX_RIGHT：窗口使用右对齐文本（镜像效果），适用于从右到左阅读的语言。",
+            L"WS_EX_LEFT：窗口使用左对齐文本（默认值）。",
+            L"WS_EX_RTLREADING：窗口文本使用从右到左的阅读顺序，适用于阿拉伯语、希伯来语等。",
+            L"WS_EX_LTRREADING：窗口文本使用从左到右的阅读顺序（默认值）。",
+            L"WS_EX_LEFTSCROLLBAR：垂直滚动条显示在客户区的左侧，适用于从右到左阅读的语言环境。",
+            L"WS_EX_RIGHTSCROLLBAR：垂直滚动条显示在客户区的右侧（默认值）。",
+            L"WS_EX_CONTROLPARENT：允许用户用 Tab 键在窗口的子控件之间导航。",
+            L"WS_EX_STATICEDGE：为静态控件创建凹陷的边框效果，常用于状态栏和面板。",
+            L"WS_EX_APPWINDOW：强制窗口在任务栏上显示一个按钮，即使窗口是工具窗口或弹出窗口。",
+            L"WS_EX_OVERLAPPEDWINDOW：组合样式，包含 WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE。",
+            L"WS_EX_PALETTEWINDOW：调色板窗口，组合了 WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_WINDOWEDGE。常用于颜色选择器等浮动面板。",
+            L"WS_EX_LAYERED：分层窗口，支持透明度和颜色键控。使用 SetLayeredWindowAttributes 或 UpdateLayeredWindow 设置透明度。本程序的信息提示窗口就使用了此样式。",
+            L"WS_EX_NOINHERITLAYOUT：子控件不继承父窗口的镜像布局方向。",
+            L"WS_EX_NOREDIRECTIONBITMAP：窗口没有重定向位图，节省显存。适用于使用 UpdateLayeredWindow 的分层窗口。",
+            L"WS_EX_LAYOUTRTL：窗口水平方向从右到左布局，子控件的坐标系统反转。",
+            L"WS_EX_COMPOSITED：窗口使用双缓冲绘制，所有子控件一起渲染，减少闪烁。但会降低性能。",
+            L"WS_EX_NOACTIVATE：点击窗口时不会使其成为活动窗口（不会获得焦点）。常用于信息提示窗口。"
+        };
+        return attrTooltipsAdd[cmd - 0xF0000000];
+    }
+    if (cmd >= 0xB0000000 && cmd <= 0xB0000035) {
+        static LPCWSTR attrTooltipsDel[] = {
+            L"移除 WS_OVERLAPPED 属性。",
+            L"移除 WS_POPUP 属性。",
+            L"移除 WS_CHILD 属性。",
+            L"移除 WS_MINIMIZE 属性。",
+            L"移除 WS_VISIBLE 属性。",
+            L"移除 WS_DISABLED 属性。",
+            L"移除 WS_CLIPSIBLINGS 属性。",
+            L"移除 WS_CLIPCHILDREN 属性。",
+            L"移除 WS_MAXIMIZE 属性。",
+            L"移除 WS_CAPTION 属性。",
+            L"移除 WS_BORDER 属性。",
+            L"移除 WS_DLGFRAME 属性。",
+            L"移除 WS_VSCROLL 属性。",
+            L"移除 WS_HSCROLL 属性。",
+            L"移除 WS_SYSMENU 属性。",
+            L"移除 WS_THICKFRAME 属性。",
+            L"移除 WS_GROUP 属性。",
+            L"移除 WS_TABSTOP 属性。",
+            L"移除 WS_MINIMIZEBOX 属性。",
+            L"移除 WS_MAXIMIZEBOX 属性。",
+            L"移除 WS_TILED 属性。",
+            L"移除 WS_ICONIC 属性。",
+            L"移除 WS_SIZEBOX 属性。",
+            L"移除 WS_TILEDWINDOW 属性。",
+            L"移除 WS_OVERLAPPEDWINDOW 属性。",
+            L"移除 WS_POPUPWINDOW 属性。",
+            L"移除 WS_CHILDWINDOW 属性。",
+            L"移除 WS_EX_DLGMODALFRAME 属性。",
+            L"移除 WS_EX_NOPARENTNOTIFY 属性。",
+            L"移除 WS_EX_TOPMOST 属性。",
+            L"移除 WS_EX_ACCEPTFILES 属性。",
+            L"移除 WS_EX_TRANSPARENT 属性。",
+            L"移除 WS_EX_MDICHILD 属性。",
+            L"移除 WS_EX_TOOLWINDOW 属性。",
+            L"移除 WS_EX_WINDOWEDGE 属性。",
+            L"移除 WS_EX_CLIENTEDGE 属性。",
+            L"移除 WS_EX_CONTEXTHELP 属性。",
+            L"移除 WS_EX_RIGHT 属性。",
+            L"移除 WS_EX_LEFT 属性。",
+            L"移除 WS_EX_RTLREADING 属性。",
+            L"移除 WS_EX_LTRREADING 属性。",
+            L"移除 WS_EX_LEFTSCROLLBAR 属性。",
+            L"移除 WS_EX_RIGHTSCROLLBAR 属性。",
+            L"移除 WS_EX_CONTROLPARENT 属性。",
+            L"移除 WS_EX_STATICEDGE 属性。",
+            L"移除 WS_EX_APPWINDOW 属性。",
+            L"移除 WS_EX_OVERLAPPEDWINDOW 属性。",
+            L"移除 WS_EX_PALETTEWINDOW 属性。",
+            L"移除 WS_EX_LAYERED 属性。",
+            L"移除 WS_EX_NOINHERITLAYOUT 属性。",
+            L"移除 WS_EX_NOREDIRECTIONBITMAP 属性。",
+            L"移除 WS_EX_LAYOUTRTL 属性。",
+            L"移除 WS_EX_COMPOSITED 属性。",
+            L"移除 WS_EX_NOACTIVATE 属性。"
+        };
+        return attrTooltipsDel[cmd - 0xB0000000];
+    }
+    // DWM 属性（添加：0xD0000000-0xD000000B，移除：0xC0000000-0xC000000B）
+    if (cmd >= 0xD0000000 && cmd <= 0xD000000B) {
+        static LPCWSTR dwmTooltipsAdd[] = {
+            L"DWMWA_NCRENDERING_POLICY：非客户区渲染策略，控制窗口边框的渲染方式。",
+            L"DWMWA_TRANSITIONS_FORCEDISABLED：禁用窗口动画过渡效果。",
+            L"DWMWA_ALLOW_NCPAINT：允许自定义非客户区绘制。",
+            L"DWMWA_NONCLIENT_RTL_LAYOUT：非客户区从右到左布局。",
+            L"DWMWA_FORCE_ICONIC_REPRESENTATION：强制窗口使用图标表示。",
+            L"DWMWA_HAS_ICONIC_BITMAP：窗口具有图标位图。",
+            L"DWMWA_DISALLOW_PEEK：禁止在任务栏预览中显示该窗口。",
+            L"DWMWA_EXCLUDED_FROM_PEEK：从任务栏预览中排除该窗口。",
+            L"DWMWA_CLOAK：隐藏窗口，使其在 Alt+Tab 切换中不可见。",
+            L"DWMWA_USE_HOSTBACKDROPBRUSH：使用宿主窗口的背景画刷。",
+            L"DWMWA_USE_IMMERSIVE_DARK_MODE：启用或禁用窗口的暗色模式。",
+            L"DWMWA_WINDOW_CORNER_PREFERENCE：设置窗口圆角偏好（默认/不圆角/小圆角/大圆角）。"
+        };
+        return dwmTooltipsAdd[cmd - 0xD0000000];
+    }
+    if (cmd >= 0xC0000000 && cmd <= 0xC000000B) {
+        static LPCWSTR dwmTooltipsDel[] = {
+            L"移除 DWMWA_NCRENDERING_POLICY 属性。",
+            L"移除 DWMWA_TRANSITIONS_FORCEDISABLED 属性。",
+            L"移除 DWMWA_ALLOW_NCPAINT 属性。",
+            L"移除 DWMWA_NONCLIENT_RTL_LAYOUT 属性。",
+            L"移除 DWMWA_FORCE_ICONIC_REPRESENTATION 属性。",
+            L"移除 DWMWA_HAS_ICONIC_BITMAP 属性。",
+            L"移除 DWMWA_DISALLOW_PEEK 属性。",
+            L"移除 DWMWA_EXCLUDED_FROM_PEEK 属性。",
+            L"移除 DWMWA_CLOAK 属性。",
+            L"移除 DWMWA_USE_HOSTBACKDROPBRUSH 属性。",
+            L"移除 DWMWA_USE_IMMERSIVE_DARK_MODE 属性。",
+            L"移除 DWMWA_WINDOW_CORNER_PREFERENCE 属性。"
+        };
+        return dwmTooltipsDel[cmd - 0xC0000000];
+    }
+    // 其他命令 ID 的 Tooltip
+    switch (cmd) {
+    case 0: return NULL; // 标题行、分隔符等无命令 ID 的项
+    case 1: return L"单击复制窗口句柄（HWND）数值到剪贴板。句柄是 Windows 唯一标识窗口的整数值。";
+    case 2: return L"单击复制窗口标题文本到剪贴板。标题是窗口标题栏上显示的文本内容。";
+    case 3: return L"单击复制窗口样式（Style）数值到剪贴板。Style 决定窗口的外观和行为，如边框类型、是否可见等。";
+    case 4: return L"单击复制窗口扩展样式（ExStyle）数值到剪贴板。ExStyle 提供额外的窗口特性，如置顶、分层等。";
+    case 5: return L"单击复制系统菜单句柄（HMENU）数值到剪贴板。系统菜单是窗口标题栏右键菜单的句柄。";
+    case 6: return L"将窗口从最大化或最小化状态恢复到正常大小。使用 ShowWindow(SW_RESTORE) 实现。";
+    case 7: return L"允许用户用鼠标或键盘移动窗口位置。发送 WM_SYSCOMMAND(SC_MOVE) 消息实现。";
+    case 8: return L"允许用户调整窗口大小。发送 WM_SYSCOMMAND(SC_SIZE) 消息实现。";
+    case 9: return L"将窗口最小化到任务栏。使用 ShowWindow(SW_MINIMIZE) 实现。";
+    case 10: return L"将窗口最大化到全屏（不含任务栏区域）。使用 ShowWindow(SW_MAXIMIZE) 实现。";
+    case 11: return L"发送关闭消息给窗口，让窗口正常关闭。发送 WM_CLOSE 消息实现。";
+    case 12: return L"将当前选中的窗口设置为父窗口。父窗口可以控制子窗口的位置和显示。";
+    case 13: return L"将当前选中的窗口设置为子窗口。子窗口会跟随父窗口移动。";
+    case 14: return L"将子窗口附加到父窗口上并清除记录。使用 SetParent() API 实现。";
+    case 15: return L"清除已记录的父窗口和子窗口句柄。重置内部状态变量。";
+    case 16: return L"将当前窗口从任何父窗口中分离，移回正常桌面。使用 SetParent(hwnd, NULL) 实现。";
+    case 17: return L"在当前窗口上生成一个模态消息对话框。模态对话框会阻塞父窗口的输入。";
+    case 18: return L"强制剥离模态窗口与父窗口的连接，使其独立。解除模态窗口的父子关系。";
+    case 0xFFFD: return L"将窗口设置为始终在最前面显示（置顶）。使用 SetWindowPos(HWND_TOPMOST) 实现。";
+    case 0xFFFE: return L"取消窗口的置顶状态，恢复正常的 Z 序。使用 SetWindowPos(HWND_NOTOPMOST) 实现。";
+    case 0xFFFC: return L"强制终止窗口。注意：可能导致进程驻留在后台。使用 TerminateProcess() 实现。";
+    case 0xF000: return L"退出 Windows Handle Finder 程序。";
+    case 0x1001: return L"以管理员权限打开命令提示符（会触发 UAC 确认）。使用 runas 启动 cmd.exe。";
+    case 0x1002: return L"以 SYSTEM 账户权限打开命令提示符（比管理员权限更高）。SYSTEM 是 Windows 最高权限账户。";
+    case 0x1003: return L"以 TrustedInstaller 权限打开命令提示符（系统文件完全控制权）。TrustedInstaller 拥有系统文件最高权限。";
+    case 0x1004: return L"绕过 UAC 提升当前程序权限（利用 IElevation COM 接口）。通过 IFileOperation COM 对象实现。";
+    default: return NULL;
+    }
+}
+// 获取菜单项文本对应的介绍（用于子菜单标题悬停）
+LPCWSTR FindTooltipByMenuText(LPCWSTR text) {
+    if (wcsstr(text, L"窗口的系统菜单")) return L"系统菜单是 Windows 为每个窗口提供的标准菜单，包含还原、移动、大小、最小化、最大化、关闭等基本操作。";
+    if (wcsstr(text, L"添加对话框属性")) return L"对话框属性是窗口的样式标志（Style），使用 SetWindowLongPtrW 函数修改。WS_ 前缀表示 Window Style，WS_EX_ 前缀表示 Extended Window Style。";
+    if (wcsstr(text, L"移除对话框属性")) return L"移除窗口的样式标志。注意：某些属性移除后可能导致窗口行为异常。";
+    if (wcsstr(text, L"添加 DWM 属性")) return L"DWM（Desktop Window Manager，桌面窗口管理器）属性，使用 DwmSetWindowAttribute 函数设置，可控制窗口的暗色模式、圆角、过渡动画等视觉效果。";
+    if (wcsstr(text, L"移除 DWM 属性")) return L"移除 DWM 属性，恢复窗口的默认行为。";
+    if (wcsstr(text, L"Windows Privilege Tools")) return L"Windows 权限工具，允许以 Administrator、System 或 TrustedInstaller 权限运行程序。需要管理员权限才能使用。";
+    if (wcsstr(text, L"更多 Windows 工具")) return L"包含 Windows 权限提升工具集，可创建不同权限级别的命令行窗口。";
+    return NULL;
+}
 LPCWSTR attributes_name[] = { L"WS_OVERLAPPED",
 L"WS_POPUP",
 L"WS_CHILD",
@@ -218,7 +427,7 @@ DWORD BypassUAC() {
 		IIEAdminBrokerObjectForAdminInstaller* adminInstaller;
 		BIND_OPTS3 bindOptions{};
 		bindOptions.dwClassContext = 4;
-		bindOptions.cbStruct = sizeof BIND_OPTS3;
+		bindOptions.cbStruct = sizeof(BIND_OPTS3);
 		CoGetObject(L"Elevation:Administrator!new:{3AD05575-8857-4850-9277-11B85BDB8E09}", &bindOptions, IID_IFileOperation, (void**)(&fileOperation));
 		CoGetObject(L"Elevation:Administrator!new:{BDB57FF2-79B9-4205-9447-F5FE85F37312}", &bindOptions, IID_IeAxiAdminInstaller, (void**)(&adminInstaller));
 		fileOperation->SetOperationFlags(276825104);
@@ -887,6 +1096,123 @@ int main() {
 						}
 						return FALSE;
 					}
+					case WM_MENUSELECT: {
+						// WM_MENUSELECT 消息：
+						//   wParam 低16位 = 命令ID（普通项）或弹出菜单句柄的低16位
+						//   wParam 高16位 = 标志位（但在64位系统上可能被句柄高16位覆盖）
+						//   lParam = 父菜单句柄
+						// 注意：在64位系统上，HMENU 是64位指针，但 WM_MENUSELECT 的
+						// wParam 只有32位，其中低16位是 uItem，高16位是 fuFlags。
+						// 对于弹出菜单项，uItem 是子菜单句柄的低16位，fuFlags 包含 MF_POPUP。
+						// 但句柄的高16位（指针的 bit 16-31）可能覆盖 fuFlags！
+						// 因此不能依赖 HIWORD(wparam) 的标志位，也不能依赖 LOWORD(wparam)
+						// 匹配子菜单句柄（因为多个句柄的低16位可能相同）。
+						// 改用 GetMenuState 的 MF_HILITE 标志遍历查找当前高亮项。
+						UINT uFlags = HIWORD(wparam);
+						if (uFlags == 0xFFFF && lparam == 0) {
+							// 菜单已关闭
+							ShowWindow(hMenuTipWnd, SW_HIDE);
+							g_menuActive = false;
+							g_lastHoverCmd = (UINT)-1;
+							break;
+						}
+						// 使用 lparam 作为父菜单句柄，遍历查找当前高亮的菜单项
+						HMENU hParentMenu = (HMENU)lparam;
+						BOOL found = FALSE;
+						if (hParentMenu && IsMenu(hParentMenu)) {
+							int topCount = GetMenuItemCount(hParentMenu);
+							// 遍历所有菜单项，用 MF_HILITE 标志找到当前高亮的项
+							// 这是最可靠的方法，不依赖 wParam 中的截断句柄
+							for (int i = 0; i < topCount; i++) {
+								UINT state = GetMenuState(hParentMenu, i, MF_BYPOSITION);
+								if (state == (UINT)-1) continue;
+								if (!(state & MF_HILITE)) continue; // 只处理高亮项
+								
+								if (state & MF_POPUP) {
+									// 弹出菜单项（子菜单标题）悬停
+									wchar_t menuText[256] = { 0 };
+									MENUITEMINFOW tmii = { sizeof(tmii) };
+									tmii.fMask = MIIM_STRING;
+									tmii.dwTypeData = menuText;
+									tmii.cch = 256;
+									if (GetMenuItemInfoW(hParentMenu, i, TRUE, &tmii)) {
+										LPCWSTR tip = FindTooltipByMenuText(menuText);
+										if (tip) {
+											SetWindowTextW(hMenuTipWnd, tip);
+											int maxW = 600;
+											int w = GetTextWidth(MenuTipFont, tip);
+											if (w > maxW) w = maxW;
+											RECT calcRect = { 0, 0, w, 0 };
+											HDC hdc = GetDC(GetDesktopWindow());
+											if (hdc) {
+												HFONT hOld = (HFONT)SelectObject(hdc, MenuTipFont);
+												DrawTextW(hdc, tip, -1, &calcRect, DT_CALCRECT | DT_WORDBREAK | DT_LEFT | DT_TOP);
+												SelectObject(hdc, hOld);
+												ReleaseDC(GetDesktopWindow(), hdc);
+												w = calcRect.right - calcRect.left + 8;
+												int h = calcRect.bottom - calcRect.top + 8;
+												POINT curPt;
+												GetCursorPos(&curPt);
+												int x = curPt.x + 20, y = curPt.y + 20;
+												if (curPt.x + w + 20 > GetSystemMetrics(SM_CXSCREEN)) {
+													x = curPt.x - w - 10;
+												}
+												if (curPt.y + h + 20 > GetSystemMetrics(SM_CYSCREEN)) {
+													y = curPt.y - h - 10;
+												}
+												SetWindowPos(hMenuTipWnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+											}
+										} else {
+											ShowWindow(hMenuTipWnd, SW_HIDE);
+										}
+										found = TRUE;
+										break;
+									}
+								} else {
+									// 普通菜单项悬停 - 获取命令ID
+									UINT id = GetMenuItemID(hParentMenu, i);
+									if (id == (UINT)-1) continue;
+									g_lastHoverCmd = id;
+									g_menuActive = true;
+									LPCWSTR tip = FindTooltipByCmd(id);
+									if (tip) {
+										SetWindowTextW(hMenuTipWnd, tip);
+										int maxW = 600;
+										int w = GetTextWidth(MenuTipFont, tip);
+										if (w > maxW) w = maxW;
+										RECT calcRect = { 0, 0, w, 0 };
+										HDC hdc = GetDC(GetDesktopWindow());
+										if (hdc) {
+											HFONT hOld = (HFONT)SelectObject(hdc, MenuTipFont);
+											DrawTextW(hdc, tip, -1, &calcRect, DT_CALCRECT | DT_WORDBREAK | DT_LEFT | DT_TOP);
+											SelectObject(hdc, hOld);
+											ReleaseDC(GetDesktopWindow(), hdc);
+											w = calcRect.right - calcRect.left + 8;
+											int h = calcRect.bottom - calcRect.top + 8;
+											POINT curPt;
+											GetCursorPos(&curPt);
+											int x = curPt.x + 20, y = curPt.y + 20;
+											if (curPt.x + w + 20 > GetSystemMetrics(SM_CXSCREEN)) {
+												x = curPt.x - w - 10;
+											}
+											if (curPt.y + h + 20 > GetSystemMetrics(SM_CYSCREEN)) {
+												y = curPt.y - h - 10;
+											}
+											SetWindowPos(hMenuTipWnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW | SWP_NOACTIVATE);
+										}
+									} else {
+										ShowWindow(hMenuTipWnd, SW_HIDE);
+									}
+									found = TRUE;
+									break;
+								}
+							}
+						}
+						if (!found) {
+							ShowWindow(hMenuTipWnd, SW_HIDE);
+						}
+						break;
+					}
 					case WM_COMMAND: {
 						if (wparam >= 0xF0000000) {
 							wstring an = wstring(attributes_name[wparam - 0xF0000000]);
@@ -1112,6 +1438,10 @@ int main() {
 	}
 	htip = CreateWindowExW(WS_EX_NOACTIVATE|WS_EX_TOPMOST, L"STATIC", 0, WS_POPUP | WS_BORDER | SS_CENTER, 0, 0, 100, 50, 0, 0, GetModuleHandleW(0), 0);
 	SendMessageW(htip, WM_SETFONT, WPARAM(TipFont), 1);
+	// 创建菜单 Tooltip 窗口（使用 EDIT 控件以支持多行自动换行）
+	hMenuTipWnd = CreateWindowExW(WS_EX_NOACTIVATE | WS_EX_TOPMOST | WS_EX_LAYERED, L"EDIT", 0, WS_POPUP | WS_BORDER | ES_MULTILINE | ES_READONLY | ES_LEFT, 0, 0, 100, 50, 0, 0, GetModuleHandleW(0), 0);
+	SendMessageW(hMenuTipWnd, WM_SETFONT, WPARAM(MenuTipFont), 1);
+	SetLayeredWindowAttributes(hMenuTipWnd, 0, 230, LWA_ALPHA);
 	hmshook = SetWindowsHookExW(WH_MOUSE_LL, [](int nCode, WPARAM wParam, LPARAM lParam) {
 		if (nCode >= 0) {
 			if ((GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_SHIFT) & 0x8000)) {
