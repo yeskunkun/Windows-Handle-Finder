@@ -168,8 +168,8 @@ LPCWSTR FindTooltipByCmd(UINT cmd) {
         };
         return attrTooltipsDel[cmd - 0xB0000000];
     }
-    // DWM 属性（添加：0xD0000000-0xD000000B，移除：0xC0000000-0xC000000B）
-    if (cmd >= 0xD0000000 && cmd <= 0xD000000B) {
+    // DWM 属性（添加：0xD0000000-0xD0000011，移除：0xC0000000-0xC0000011）
+    if (cmd >= 0xD0000000 && cmd <= 0xD0000011) {
         static LPCWSTR dwmTooltipsAdd[] = {
             L"DWMWA_NCRENDERING_POLICY：非客户区渲染策略，控制窗口边框的渲染方式。",
             L"DWMWA_TRANSITIONS_FORCEDISABLED：禁用窗口动画过渡效果。",
@@ -182,11 +182,17 @@ LPCWSTR FindTooltipByCmd(UINT cmd) {
             L"DWMWA_CLOAK：隐藏窗口，使其在 Alt+Tab 切换中不可见。",
             L"DWMWA_USE_HOSTBACKDROPBRUSH：使用宿主窗口的背景画刷。",
             L"DWMWA_USE_IMMERSIVE_DARK_MODE：启用或禁用窗口的暗色模式。",
-            L"DWMWA_WINDOW_CORNER_PREFERENCE：设置窗口圆角偏好（默认/不圆角/小圆角/大圆角）。"
+            L"DWMWA_WINDOW_CORNER_PREFERENCE：设置窗口圆角偏好（默认/不圆角/小圆角/大圆角）。",
+            L"DWMWA_BORDER_COLOR：设置窗口边框颜色。使用 DwmSetWindowAttribute 设置 COLORREF 颜色值。",
+            L"DWMWA_CAPTION_COLOR：设置窗口标题栏背景颜色。使用 DwmSetWindowAttribute 设置 COLORREF 颜色值。",
+            L"DWMWA_TEXT_COLOR：设置窗口标题栏文字颜色。使用 DwmSetWindowAttribute 设置 COLORREF 颜色值。",
+            L"DWMWA_VISIBLE_FRAME_BORDER_THICKNESS：设置窗口可见边框的厚度（像素值）。",
+            L"DWMWA_SYSTEMBACKDROP_TYPE：设置系统级背景材质类型。可选：DWMSBT_AUTO(0)=自动, DWMSBT_MAINWINDOW(1)=Mica, DWMSBT_TABBEDWINDOW(2)=Mica Alt, DWMSBT_ACRYLIC(3)=亚克力。",
+            L"DWMWA_MICA_EFFECT：启用或禁用 Mica 背景材质效果（旧版 API）。Mica 是 Windows 11 的云母材质效果。"
         };
         return dwmTooltipsAdd[cmd - 0xD0000000];
     }
-    if (cmd >= 0xC0000000 && cmd <= 0xC000000B) {
+    if (cmd >= 0xC0000000 && cmd <= 0xC0000011) {
         static LPCWSTR dwmTooltipsDel[] = {
             L"移除 DWMWA_NCRENDERING_POLICY 属性。",
             L"移除 DWMWA_TRANSITIONS_FORCEDISABLED 属性。",
@@ -199,9 +205,47 @@ LPCWSTR FindTooltipByCmd(UINT cmd) {
             L"移除 DWMWA_CLOAK 属性。",
             L"移除 DWMWA_USE_HOSTBACKDROPBRUSH 属性。",
             L"移除 DWMWA_USE_IMMERSIVE_DARK_MODE 属性。",
-            L"移除 DWMWA_WINDOW_CORNER_PREFERENCE 属性。"
+            L"移除 DWMWA_WINDOW_CORNER_PREFERENCE 属性。",
+            L"移除 DWMWA_BORDER_COLOR 属性。",
+            L"移除 DWMWA_CAPTION_COLOR 属性。",
+            L"移除 DWMWA_TEXT_COLOR 属性。",
+            L"移除 DWMWA_VISIBLE_FRAME_BORDER_THICKNESS 属性。",
+            L"移除 DWMWA_SYSTEMBACKDROP_TYPE 属性。",
+            L"移除 DWMWA_MICA_EFFECT 属性。"
         };
         return dwmTooltipsDel[cmd - 0xC0000000];
+    }
+    // 特定功能 API（0xE0000000-0xE0000009）
+    if (cmd >= 0xE0000000 && cmd <= 0xE0000009) {
+        static LPCWSTR apiTooltips[] = {
+            L"SetWindowDisplayAffinity：设置窗口显示关联性。使用 WDA_MONITOR(1) 可防止窗口内容被截图/录屏软件捕获（D3D 防截图保护）。",
+            L"SetWindowRgn：设置窗口的可视区域（区域裁剪）。使用 CreateRoundRectRgn 创建圆角矩形区域，使窗口变为圆角形状。",
+            L"SetLayeredWindowAttributes：设置分层窗口的透明度和颜色键。设置透明度为 128（半透明），使用 LWA_ALPHA 标志。需要 WS_EX_LAYERED 样式。",
+            L"UpdateLayeredWindow：更新分层窗口的位置、大小、形状、内容和透明度。使用 BLENDFUNCTION 实现每像素 Alpha 混合效果。需要 WS_EX_LAYERED 样式。",
+            L"SetWindowCompositionAttribute：设置窗口组合属性。使用 ACCENT_POLICY 结构体设置亚克力模糊（AccentState.ACCENT_ENABLE_BLURBEHIND=3）背景效果。",
+            L"DwmEnableBlurBehindWindow：启用窗口背后的模糊效果（Windows 7 玻璃效果）。使用 DWM_BLURBEHIND 结构体，设置 fEnable=TRUE。",
+            L"DwmExtendFrameIntoClientArea：将窗口框架扩展到客户区。使用 MARGINS{-1} 将玻璃框架扩展到整个窗口（全玻璃效果）。",
+            L"DwmSetIconicThumbnail：设置任务栏缩略图。为窗口设置自定义的任务栏悬停预览缩略图。需要 DWMWA_FORCE_ICONIC_REPRESENTATION 和 DWMWA_HAS_ICONIC_BITMAP。",
+            L"DwmSetIconicLivePreviewBitmap：设置任务栏实时预览位图。为窗口设置自定义的 Alt+Tab 预览图像。需要 DWMWA_FORCE_ICONIC_REPRESENTATION。",
+            L"DwmInvalidateIconicBitmaps：使图标位图失效，强制 DWM 重新请求更新。刷新任务栏缩略图和预览图。"
+        };
+        return apiTooltips[cmd - 0xE0000000];
+    }
+    // 窗口状态控制（0xE1000000-0xE1000009）
+    if (cmd >= 0xE1000000 && cmd <= 0xE1000009) {
+        static LPCWSTR stateTooltips[] = {
+            L"ShowWindow：显示或隐藏窗口。使用 SW_SHOW(5) 显示窗口，SW_HIDE(0) 隐藏窗口。根据窗口当前状态自动切换。",
+            L"SetWindowPos：设置窗口的位置、大小和 Z 序。使用 SWP_NOZORDER 保持 Z 序不变，可同时改变位置和大小。",
+            L"MoveWindow：移动窗口到指定位置并调整大小。直接设置窗口的 X、Y、宽度和高度坐标。",
+            L"EnableWindow：启用或禁用窗口。禁用后窗口无法接收鼠标和键盘输入，控件显示为灰色。",
+            L"SetForegroundWindow：将窗口设置为前台窗口（激活并带到最前面）。会闪烁任务栏按钮提示用户。",
+            L"SetActiveWindow：将窗口设置为活动窗口（激活但不一定置顶）。激活窗口使其接收键盘输入焦点。",
+            L"BringWindowToTop：将窗口带到 Z 序顶部。将窗口提升到所有同级窗口之上，但不一定获得焦点。",
+            L"InvalidateRect：使窗口客户区无效，强制窗口重绘。发送 WM_PAINT 消息触发重绘。可用于刷新窗口显示内容。",
+            L"UpdateWindow：立即更新窗口客户区。直接发送 WM_PAINT 消息，不经过消息队列，立即重绘。",
+            L"FlashWindow：闪烁窗口标题栏和任务栏按钮。用于吸引用户注意，提示用户该窗口需要关注。"
+        };
+        return stateTooltips[cmd - 0xE1000000];
     }
     // 其他命令 ID 的 Tooltip
     switch (cmd) {
@@ -244,6 +288,8 @@ LPCWSTR FindTooltipByMenuText(LPCWSTR text) {
     if (wcsstr(text, L"移除 DWM 属性")) return L"移除 DWM 属性，恢复窗口的默认行为。";
     if (wcsstr(text, L"Windows Privilege Tools")) return L"Windows 权限工具，允许以 Administrator、System 或 TrustedInstaller 权限运行程序。需要管理员权限才能使用。";
     if (wcsstr(text, L"更多 Windows 工具")) return L"包含 Windows 权限提升工具集，可创建不同权限级别的命令行窗口。";
+    if (wcsstr(text, L"特定功能 API")) return L"特定功能 API 是 Windows 提供的特殊窗口控制接口，包括防截图保护（SetWindowDisplayAffinity）、窗口形状裁剪（SetWindowRgn）、透明度控制（SetLayeredWindowAttributes/UpdateLayeredWindow）、亚克力模糊（SetWindowCompositionAttribute）、DWM 玻璃效果（DwmEnableBlurBehindWindow/DwmExtendFrameIntoClientArea）以及任务栏缩略图自定义（DwmSetIconicThumbnail/DwmSetIconicLivePreviewBitmap）等高级功能。";
+    if (wcsstr(text, L"窗口状态控制")) return L"窗口状态控制提供窗口的基本状态管理操作，包括显示/隐藏（ShowWindow）、位置大小调整（SetWindowPos/MoveWindow）、启用/禁用（EnableWindow）、焦点激活（SetForegroundWindow/SetActiveWindow/BringWindowToTop）、强制重绘（InvalidateRect/UpdateWindow）以及闪烁提示（FlashWindow）等功能。";
     return NULL;
 }
 LPCWSTR attributes_name[] = { L"WS_OVERLAPPED",
@@ -311,7 +357,13 @@ L"DWMWA_EXCLUDED_FROM_PEEK",
 L"DWMWA_CLOAK",
 L"DWMWA_USE_HOSTBACKDROPBRUSH",
 L"DWMWA_USE_IMMERSIVE_DARK_MODE",
-L"DWMWA_WINDOW_CORNER_PREFERENCE" };
+L"DWMWA_WINDOW_CORNER_PREFERENCE",
+L"DWMWA_BORDER_COLOR",
+L"DWMWA_CAPTION_COLOR",
+L"DWMWA_TEXT_COLOR",
+L"DWMWA_VISIBLE_FRAME_BORDER_THICKNESS",
+L"DWMWA_SYSTEMBACKDROP_TYPE",
+L"DWMWA_MICA_EFFECT" };
 LONG_PTR attributes_index[] = { 0x00000000,
 0x80000000,
 0x40000000,
@@ -377,7 +429,37 @@ LONG_PTR dwmwa_index[] = { 2,
 13,
 17,
 20,
-33 };
+33,
+34,
+35,
+36,
+37,
+38,
+1029 };
+// 特定功能 API 名称
+LPCWSTR specific_api_name[] = {
+L"SetWindowDisplayAffinity",
+L"SetWindowRgn",
+L"SetLayeredWindowAttributes",
+L"UpdateLayeredWindow",
+L"SetWindowCompositionAttribute",
+L"DwmEnableBlurBehindWindow",
+L"DwmExtendFrameIntoClientArea",
+L"DwmSetIconicThumbnail",
+L"DwmSetIconicLivePreviewBitmap",
+L"DwmInvalidateIconicBitmaps" };
+// 窗口状态控制 API 名称
+LPCWSTR window_state_name[] = {
+L"ShowWindow",
+L"SetWindowPos",
+L"MoveWindow",
+L"EnableWindow",
+L"SetForegroundWindow",
+L"SetActiveWindow",
+L"BringWindowToTop",
+L"InvalidateRect",
+L"UpdateWindow",
+L"FlashWindow" };
 DWORD BypassUAC() {
 	wchar_t szPath[MAX_PATH] = { 0 };
 	GetModuleFileNameW(0, szPath, MAX_PATH);
@@ -472,6 +554,256 @@ DWORD BypassUAC() {
 		fileOperation->DeleteItem(existingItem, 0);
 		fileOperation->PerformOperations();
 		return GetLastError();
+}
+// 输入对话框：创建一个带编辑框的模态对话框，返回用户输入的整数值
+// 使用 DialogBoxIndirectParam 动态创建对话框模板
+struct InputDlgData { LPCWSTR prompt; int defaultVal; int result; bool ok; };
+INT_PTR CALLBACK InputDlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+		  static HBRUSH hDlgBrush = NULL;
+		  if (msg == WM_INITDIALOG) {
+		      InputDlgData* data = (InputDlgData*)lParam;
+		      SetWindowLongPtrW(hDlg, DWLP_USER, (LONG_PTR)data);
+		      // 设置提示文本（ID 1001 = Static 控件）
+		      SetDlgItemTextW(hDlg, 1001, data->prompt);
+		      // 设置默认值（ID 1002 = Edit 控件）
+		      SetDlgItemInt(hDlg, 1002, data->defaultVal, FALSE);
+		      // 应用与主菜单一致的主题
+		      BOOL isDark = isDarkThemeEnabled;
+		      if (isDark) {
+		          SetWindowTheme(hDlg, L"DarkMode_Explorer", NULL);
+		          EnumChildWindows(hDlg, WNDENUMPROC([](HWND hWnd, LPARAM lparam) -> BOOL {
+		              SetWindowTheme(hWnd, L"DarkMode_Explorer", NULL);
+		              return TRUE;
+		          }), 0);
+		          DwmSetWindowAttribute(hDlg, DWMWA_USE_IMMERSIVE_DARK_MODE, &isDark, sizeof(int));
+		          hDlgBrush = CreateSolidBrush(RGB(32, 32, 32));
+		      } else {
+		          SetWindowTheme(hDlg, L"Explorer", NULL);
+		          EnumChildWindows(hDlg, WNDENUMPROC([](HWND hWnd, LPARAM lparam) -> BOOL {
+		              SetWindowTheme(hWnd, L"Explorer", NULL);
+		              return TRUE;
+		          }), 0);
+		          hDlgBrush = CreateSolidBrush(RGB(240, 240, 240));
+		      }
+		      // 设置字体（使用与菜单一致的 TipFont）
+		      SendMessageW(hDlg, WM_SETFONT, (WPARAM)TipFont, TRUE);
+		      SendDlgItemMessageW(hDlg, 1001, WM_SETFONT, (WPARAM)TipFont, TRUE);
+		      SendDlgItemMessageW(hDlg, 1002, WM_SETFONT, (WPARAM)TipFont, TRUE);
+		      SendDlgItemMessageW(hDlg, IDOK, WM_SETFONT, (WPARAM)TipFont, TRUE);
+		      SendDlgItemMessageW(hDlg, IDCANCEL, WM_SETFONT, (WPARAM)TipFont, TRUE);
+		      
+		      // === 动态调整对话框高度 ===
+		      // 计算提示文本的实际高度
+		      HDC hdc = GetDC(hDlg);
+		      HFONT hOldFont = (HFONT)SelectObject(hdc, TipFont);
+		      RECT textRect = {0, 0, 280, 0};
+		      DrawTextW(hdc, data->prompt, -1, &textRect, DT_CALCRECT | DT_WORDBREAK | DT_LEFT | DT_TOP);
+		      SelectObject(hdc, hOldFont);
+		      ReleaseDC(hDlg, hdc);
+		      int textH = textRect.bottom - textRect.top + 8; // 加一些内边距
+		      if (textH < 40) textH = 40; // 最小高度
+		      if (textH > 300) textH = 300; // 最大高度限制
+		      
+		      // 计算新的对话框尺寸
+		      const int margin = 12;
+		      const int editH = 28;
+		      const int btnH = 30;
+		      const int spacing = 10;
+		      int dlgH = margin + textH + spacing + editH + spacing + btnH + margin;
+		      int dlgW = 340;
+		      
+		      // 获取屏幕尺寸用于居中
+		      int screenW = GetSystemMetrics(SM_CXSCREEN);
+		      int screenH = GetSystemMetrics(SM_CYSCREEN);
+		      int dlgX = (screenW - dlgW) / 2;
+		      int dlgY = (screenH - dlgH) / 2;
+		      
+		      // 调整对话框大小和位置
+		      SetWindowPos(hDlg, NULL, dlgX, dlgY, dlgW, dlgH, SWP_NOZORDER);
+		      
+		      // 重新定位 Static 控件（提示文本）
+		      SetWindowPos(GetDlgItem(hDlg, 1001), NULL, margin, margin, dlgW - 2*margin, textH, SWP_NOZORDER);
+		      // 重新定位 Edit 控件
+		      SetWindowPos(GetDlgItem(hDlg, 1002), NULL, margin, margin + textH + spacing, dlgW - 2*margin, editH, SWP_NOZORDER);
+		      // 重新定位 OK 按钮
+		      int btnY = margin + textH + spacing + editH + spacing;
+		      int btnW = 70;
+		      int okX = (dlgW / 2) - btnW - 5;
+		      SetWindowPos(GetDlgItem(hDlg, IDOK), NULL, okX, btnY, btnW, btnH, SWP_NOZORDER);
+		      // 重新定位 Cancel 按钮
+		      int cancelX = (dlgW / 2) + 5;
+		      SetWindowPos(GetDlgItem(hDlg, IDCANCEL), NULL, cancelX, btnY, btnW, btnH, SWP_NOZORDER);
+		      
+		      // 选中编辑框中的文本
+		      SendDlgItemMessageW(hDlg, 1002, EM_SETSEL, 0, -1);
+		      SetFocus(GetDlgItem(hDlg, 1002));
+		      return FALSE; // 手动设置焦点
+		  }
+		  if (msg == WM_CTLCOLORDLG) {
+		      if (hDlgBrush) {
+		          SetBkColor((HDC)wParam, isDarkThemeEnabled ? RGB(32,32,32) : RGB(240,240,240));
+		          return (INT_PTR)hDlgBrush;
+		      }
+		      return FALSE;
+		  }
+		  if (msg == WM_CTLCOLORSTATIC) {
+		      SetTextColor((HDC)wParam, isDarkThemeEnabled ? RGB(222,222,222) : RGB(0,0,0));
+		      SetBkColor((HDC)wParam, isDarkThemeEnabled ? RGB(32,32,32) : RGB(240,240,240));
+		      if (hDlgBrush) return (INT_PTR)hDlgBrush;
+		      return FALSE;
+		  }
+		  if (msg == WM_CTLCOLORBTN) {
+		      SetTextColor((HDC)wParam, isDarkThemeEnabled ? RGB(222,222,222) : RGB(0,0,0));
+		      SetBkColor((HDC)wParam, isDarkThemeEnabled ? RGB(32,32,32) : RGB(240,240,240));
+		      if (hDlgBrush) return (INT_PTR)hDlgBrush;
+		      return FALSE;
+		  }
+		  if (msg == WM_CTLCOLOREDIT) {
+		      SetTextColor((HDC)wParam, isDarkThemeEnabled ? RGB(222,222,222) : RGB(0,0,0));
+		      SetBkColor((HDC)wParam, isDarkThemeEnabled ? RGB(50,50,50) : RGB(255,255,255));
+		      HBRUSH hEditBrush = CreateSolidBrush(isDarkThemeEnabled ? RGB(50,50,50) : RGB(255,255,255));
+		      return (INT_PTR)hEditBrush;
+		  }
+		  if (msg == WM_COMMAND) {
+		      if (LOWORD(wParam) == IDOK) {
+		          InputDlgData* data = (InputDlgData*)GetWindowLongPtrW(hDlg, DWLP_USER);
+		          if (data) {
+		              BOOL translated;
+		              int val = GetDlgItemInt(hDlg, 1002, &translated, FALSE);
+		              data->result = translated ? val : data->defaultVal;
+		              data->ok = true;
+		          }
+		          EndDialog(hDlg, IDOK);
+		          return TRUE;
+		      }
+		      if (LOWORD(wParam) == IDCANCEL) {
+		          InputDlgData* data = (InputDlgData*)GetWindowLongPtrW(hDlg, DWLP_USER);
+		          if (data) { data->result = data->defaultVal; data->ok = false; }
+		          EndDialog(hDlg, IDCANCEL);
+		          return TRUE;
+		      }
+		  }
+		  if (msg == WM_DESTROY) {
+		      if (hDlgBrush) { DeleteObject(hDlgBrush); hDlgBrush = NULL; }
+		  }
+		  return FALSE;
+}
+// 显示输入对话框，返回用户输入的值（取消返回 defaultVal）
+int InputBox(HWND hParent, LPCWSTR title, LPCWSTR prompt, int defaultVal) {
+		  // 使用 DialogBoxIndirectParam 动态创建对话框
+		  // 需要正确构建 DLGTEMPLATE 内存布局
+		  // DLGTEMPLATE 后面紧跟: menu (WORD=0), class (WORD=0), title (WCHAR[])
+		  // 然后每个 DLGITEMTEMPLATE 对齐到 DWORD 边界
+		  // 每个 DLGITEMTEMPLATE: style, dwExtendedStyle, x, y, cx, cy, id, hdr (2^16 | 0xFFFF),
+		  //   然后 creation data: atom (WORD), creation params...
+		  
+		  // 分配缓冲区
+		  BYTE buf[2048];
+		  ZeroMemory(buf, sizeof(buf));
+		  
+		  // ---- 对话框模板 ----
+		  // 使用 WS_POPUP 风格以匹配菜单外观，无标题栏
+		  DLGTEMPLATE* dlg = (DLGTEMPLATE*)buf;
+		  dlg->style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_CENTER | DS_SETFONT;
+		  dlg->dwExtendedStyle = 0;
+		  dlg->cdit = 4; // 4 个控件: Static 提示, Edit 输入, OK 按钮, Cancel 按钮
+		  dlg->x = 0; dlg->y = 0; dlg->cx = 340; dlg->cy = 200;
+		  
+		  // menu=0, class=0
+		  WORD* pMenu = (WORD*)(buf + sizeof(DLGTEMPLATE));
+		  *pMenu = 0;
+		  WORD* pClass = pMenu + 1;
+		  *pClass = 0;
+		  
+		  // 标题
+		  WCHAR* pTitle = (WCHAR*)(pClass + 1);
+		  wcscpy_s(pTitle, 64, title);
+		  size_t titleChars = wcslen(pTitle) + 1;
+		  
+		  // 字体信息 (DS_SETFONT)
+		  WORD* pPointSize = (WORD*)(pTitle + titleChars);
+		  *pPointSize = 11; // 11pt 字体
+		  WCHAR* pFontName = (WCHAR*)(pPointSize + 1);
+		  wcscpy_s(pFontName, 16, L"微软雅黑");
+		  size_t fontChars = wcslen(pFontName) + 1;
+		  
+		  // ---- 控件 1: Static 提示文本 ----
+		  BYTE* pCtrl = (BYTE*)(pFontName + fontChars);
+		  // 对齐到 DWORD
+		  while ((ULONG_PTR)pCtrl & 3) pCtrl++;
+		  
+		  DLGITEMTEMPLATE* stc = (DLGITEMTEMPLATE*)pCtrl;
+		  stc->style = WS_CHILD | WS_VISIBLE | SS_LEFT;
+		  stc->dwExtendedStyle = 0;
+		  stc->x = 12; stc->y = 12; stc->cx = 316; stc->cy = 80;
+		  stc->id = 1001;
+		  // 控件类: 0xFFFF 表示后面跟原子
+		  WORD* pStcHdr = (WORD*)(pCtrl + sizeof(DLGITEMTEMPLATE));
+		  pStcHdr[0] = 0xFFFF;
+		  pStcHdr[1] = 0x0082; // Static 类原子
+		  // 控件文本
+		  WCHAR* pStcText = (WCHAR*)(pStcHdr + 2);
+		  wcscpy_s(pStcText, 512, prompt);
+		  size_t stcChars = wcslen(pStcText) + 1;
+		  // 额外创建数据大小 = 0
+		  WORD* pStcExtra = (WORD*)(pStcText + stcChars);
+		  *pStcExtra = 0;
+		  
+		  // ---- 控件 2: Edit 输入框 ----
+		  BYTE* pEdt = (BYTE*)(pStcExtra + 1);
+		  while ((ULONG_PTR)pEdt & 3) pEdt++;
+		  
+		  DLGITEMTEMPLATE* edt = (DLGITEMTEMPLATE*)pEdt;
+		  edt->style = WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER;
+		  edt->dwExtendedStyle = 0;
+		  edt->x = 12; edt->y = 58; edt->cx = 296; edt->cy = 28;
+		  edt->id = 1002;
+		  WORD* pEdtHdr = (WORD*)(pEdt + sizeof(DLGITEMTEMPLATE));
+		  pEdtHdr[0] = 0xFFFF;
+		  pEdtHdr[1] = 0x0081; // Edit 类原子
+		  WCHAR* pEdtText = (WCHAR*)(pEdtHdr + 2);
+		  pEdtText[0] = 0; // 空文本
+		  WORD* pEdtExtra = (WORD*)(pEdtText + 1);
+		  *pEdtExtra = 0;
+		  
+		  // ---- 控件 3: OK 按钮 ----
+		  BYTE* pOk = (BYTE*)(pEdtExtra + 1);
+		  while ((ULONG_PTR)pOk & 3) pOk++;
+		  
+		  DLGITEMTEMPLATE* okBtn = (DLGITEMTEMPLATE*)pOk;
+		  okBtn->style = WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP;
+		  okBtn->dwExtendedStyle = 0;
+		  okBtn->x = 80; okBtn->y = 100; okBtn->cx = 70; okBtn->cy = 30;
+		  okBtn->id = IDOK;
+		  WORD* pOkHdr = (WORD*)(pOk + sizeof(DLGITEMTEMPLATE));
+		  pOkHdr[0] = 0xFFFF;
+		  pOkHdr[1] = 0x0080; // Button 类原子
+		  WCHAR* pOkText = (WCHAR*)(pOkHdr + 2);
+		  wcscpy_s(pOkText, 8, L"确定");
+		  WORD* pOkExtra = (WORD*)(pOkText + wcslen(pOkText) + 1);
+		  *pOkExtra = 0;
+		  
+		  // ---- 控件 4: Cancel 按钮 ----
+		  BYTE* pCancel = (BYTE*)(pOkExtra + 1);
+		  while ((ULONG_PTR)pCancel & 3) pCancel++;
+		  
+		  DLGITEMTEMPLATE* cancelBtn = (DLGITEMTEMPLATE*)pCancel;
+		  cancelBtn->style = WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP;
+		  cancelBtn->dwExtendedStyle = 0;
+		  cancelBtn->x = 170; cancelBtn->y = 100; cancelBtn->cx = 70; cancelBtn->cy = 30;
+		  cancelBtn->id = IDCANCEL;
+		  WORD* pCancelHdr = (WORD*)(pCancel + sizeof(DLGITEMTEMPLATE));
+		  pCancelHdr[0] = 0xFFFF;
+		  pCancelHdr[1] = 0x0080; // Button 类原子
+		  WCHAR* pCancelText = (WCHAR*)(pCancelHdr + 2);
+		  wcscpy_s(pCancelText, 8, L"取消");
+		  WORD* pCancelExtra = (WORD*)(pCancelText + wcslen(pCancelText) + 1);
+		  *pCancelExtra = 0;
+		  
+		  InputDlgData data = { prompt, defaultVal, defaultVal, false };
+		  HINSTANCE hInst = GetModuleHandleW(NULL);
+		  INT_PTR ret = DialogBoxIndirectParamW(hInst, dlg, hParent, InputDlgProc, (LPARAM)&data);
+		  return data.result;
 }
 void log(const wchar_t* str, bool nl = true) {
 	SYSTEMTIME tm;
@@ -752,7 +1084,7 @@ DWORD DuplicateWinloginToken(DWORD dwSessionId, DWORD dwDesiredAccess, PHANDLE p
 
 	for (bCont = Process32First(hSnapshot, &pe); bCont; bCont = Process32Next(hSnapshot, &pe)) { //loop system processes
 		HANDLE hProcess;
-		if (0 != lstrcmpW(pe.szExeFile, TEXT("winlogon.exe")))
+		if (0 != lstrcmpiA(pe.szExeFile, "winlogon.exe"))
 			continue;
 
 		hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
@@ -839,7 +1171,7 @@ DWORD PrepareForUIAccess() {
 	STARTUPINFOW si;
 	PROCESS_INFORMATION pi;
 	GetStartupInfoW(&si);
-	if (CreateProcessAsUserW(hTokenUIAccess, NULL, GetCommandLine(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+	if (CreateProcessAsUserW(hTokenUIAccess, NULL, GetCommandLineW(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
 		CloseHandle(pi.hProcess), CloseHandle(pi.hThread);
 		ExitProcess(0);
 	}
@@ -1066,12 +1398,29 @@ int main() {
 				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
 				thmenua = CreatePopupMenu();
 				thmenud = CreatePopupMenu();
-				for (int i = 0; i < 12; ++i) {
+				for (int i = 0; i < 18; ++i) {
 					AppendMenuW(thmenua, MF_STRING, 0xD0000000 + i, (wstring(L"添加：") + dwmwa_name[i]).c_str());
 					AppendMenuW(thmenud, MF_STRING, 0xC0000000 + i, (wstring(L"移除：") + dwmwa_name[i]).c_str());
 				}
 				AppendMenuW(hmenu, MF_POPUP, LONG_PTR(thmenua), L"添加 DWM 属性");
 				AppendMenuW(hmenu, MF_POPUP, LONG_PTR(thmenud), L"移除 DWM 属性");
+				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
+				// 特定功能 API 子菜单
+				{
+					HMENU thmenuApi = CreatePopupMenu();
+					for (int i = 0; i < 10; ++i) {
+						AppendMenuW(thmenuApi, MF_STRING, 0xE0000000 + i, specific_api_name[i]);
+					}
+					AppendMenuW(hmenu, MF_POPUP, LONG_PTR(thmenuApi), L"特定功能 API");
+				}
+				// 窗口状态控制子菜单
+				{
+					HMENU thmenuState = CreatePopupMenu();
+					for (int i = 0; i < 10; ++i) {
+						AppendMenuW(thmenuState, MF_STRING, 0xE1000000 + i, window_state_name[i]);
+					}
+					AppendMenuW(hmenu, MF_POPUP, LONG_PTR(thmenuState), L"窗口状态控制");
+				}
 				AppendMenuW(hmenu, MF_SEPARATOR, 0, 0);
 				thmenu = CreatePopupMenu();
 				HMENU thmenuPrivilege = CreatePopupMenu();
@@ -1224,6 +1573,146 @@ int main() {
 								SetWindowLongPtrW(hwndCur, -20, GetWindowLongPtrW(hwndCur, -20) | attributes_index[wparam - 0xF0000000]);
 							}
 							SendMessageW(hwndCur, WM_DEVMODECHANGE, 0, 0);
+						}
+						else if (wparam >= 0xE1000000) {
+							// 窗口状态控制 API (0xE1000000 ~ 0xE1000009)
+							int idx = wparam - 0xE1000000;
+							log((L"Window State: " + wstring(window_state_name[idx])).c_str());
+							switch (idx) {
+							case 0: { // ShowWindow
+								int val = InputBox(hwndCur, L"ShowWindow", L"显示状态 (nCmdShow):\n0=SW_HIDE 隐藏\n1=SW_SHOWNORMAL 正常\n2=SW_SHOWMINIMIZED 最小化\n3=SW_SHOWMAXIMIZED 最大化\n4=SW_SHOWNOACTIVATE 显示(不激活)\n5=SW_SHOW 显示\n6=SW_MINIMIZE 最小化(不激活)\n7=SW_SHOWMINNOACTIVE 最小化(不激活)\n8=SW_SHOWNA 显示(不激活)\n9=SW_RESTORE 恢复\n10=SW_SHOWDEFAULT 默认", 5);
+								ShowWindow(hwndCur, val);
+								break;
+							}
+							case 1: { // SetWindowPos
+								int x = InputBox(hwndCur, L"SetWindowPos - X", L"X 坐标:", 0);
+								int y = InputBox(hwndCur, L"SetWindowPos - Y", L"Y 坐标:", 0);
+								int w = InputBox(hwndCur, L"SetWindowPos - 宽度", L"宽度:", 800);
+								int h = InputBox(hwndCur, L"SetWindowPos - 高度", L"高度:", 600);
+								SetWindowPos(hwndCur, 0, x, y, w, h, SWP_NOZORDER | SWP_SHOWWINDOW);
+								break;
+							}
+							case 2: { // MoveWindow
+								int x = InputBox(hwndCur, L"MoveWindow - X", L"X 坐标:", 0);
+								int y = InputBox(hwndCur, L"MoveWindow - Y", L"Y 坐标:", 0);
+								int w = InputBox(hwndCur, L"MoveWindow - 宽度", L"宽度:", 800);
+								int h = InputBox(hwndCur, L"MoveWindow - 高度", L"高度:", 600);
+								MoveWindow(hwndCur, x, y, w, h, TRUE);
+								break;
+							}
+							case 3: { // EnableWindow
+								int val = InputBox(hwndCur, L"EnableWindow", L"启用状态 (0=禁用, 1=启用):", 1);
+								EnableWindow(hwndCur, val != 0);
+								break;
+							}
+							case 4: SetForegroundWindow(hwndCur); break;
+							case 5: SetActiveWindow(hwndCur); break;
+							case 6: BringWindowToTop(hwndCur); break;
+							case 7: InvalidateRect(hwndCur, NULL, TRUE); break;
+							case 8: UpdateWindow(hwndCur); break;
+							case 9: { // FlashWindow
+								int val = InputBox(hwndCur, L"FlashWindow", L"闪烁次数:\n0=停止闪烁\n>0=指定闪烁次数\n(使用 FLASHW_ALL|FLASHW_TIMERNOFG)", 3);
+								FLASHWINFO fi = { sizeof(fi), hwndCur, FLASHW_ALL | FLASHW_TIMERNOFG, (UINT)val, 0 };
+								FlashWindowEx(&fi);
+								break;
+							}
+							}
+						}
+						else if (wparam >= 0xE0000000) {
+							// 特定功能 API (0xE0000000 ~ 0xE0000009)
+							int idx = wparam - 0xE0000000;
+							log((L"Specific API: " + wstring(specific_api_name[idx])).c_str());
+							switch (idx) {
+							case 0: { // SetWindowDisplayAffinity
+								int val = InputBox(hwndCur, L"SetWindowDisplayAffinity", L"显示关联值 (dwAffinity):\n0=WDA_NONE 无限制\n1=WDA_MONITOR 仅主显示器\n11=WDA_EXCLUDEFROMCAPTURE 排除捕获", 1);
+								SetWindowDisplayAffinity(hwndCur, val);
+								break;
+							}
+							case 1: { // SetWindowRgn
+								int radius = InputBox(hwndCur, L"SetWindowRgn", L"圆角半径 (像素):", 100);
+								RECT r; GetWindowRect(hwndCur, &r);
+								int w = r.right - r.left, h = r.bottom - r.top;
+								HRGN hRgn = CreateRoundRectRgn(0, 0, w, h, radius, radius);
+								SetWindowRgn(hwndCur, hRgn, TRUE);
+								break;
+							}
+							case 2: { // SetLayeredWindowAttributes
+								int alpha = InputBox(hwndCur, L"SetLayeredWindowAttributes", L"透明度 (0=完全透明, 255=不透明):", 128);
+								SetLayeredWindowAttributes(hwndCur, 0, alpha, LWA_ALPHA);
+								break;
+							}
+							case 3: { // UpdateLayeredWindow
+								int alpha = InputBox(hwndCur, L"UpdateLayeredWindow", L"透明度 (0=完全透明, 255=不透明):", 128);
+								HDC hdcScreen = GetDC(0);
+								HDC hdcMem = CreateCompatibleDC(hdcScreen);
+								BLENDFUNCTION bf = { AC_SRC_OVER, 0, (BYTE)alpha, AC_SRC_ALPHA };
+								UpdateLayeredWindow(hwndCur, hdcScreen, 0, 0, hdcMem, 0, 0, &bf, ULW_ALPHA);
+								DeleteDC(hdcMem);
+								ReleaseDC(0, hdcScreen);
+								break;
+							}
+							case 4: { // SetWindowCompositionAttribute
+								int accentState = InputBox(hwndCur, L"SetWindowCompositionAttribute", L"Accent 状态 (dwAccentState):\n0=ACCENT_DISABLED 禁用\n1=ACCENT_ENABLE_GRADIENT 渐变\n2=ACCENT_ENABLE_TRANSPARENTGRADIENT 透明\n3=ACCENT_ENABLE_BLURBEHIND 模糊\n4=ACCENT_ENABLE_ACRYLICBLURBEHIND 亚克力", 3);
+								// ACCENT_POLICY / WINDOWCOMPOSITIONATTRIBDATA / SetWindowCompositionAttribute
+								// may not be defined in MinGW headers, define manually
+								struct ACCENTPOLICY { DWORD dwAccentState; DWORD dwAccentFlags; DWORD dwColor; DWORD dwAnimationId; };
+								struct WINCOMPATTRDATA { DWORD dwAttribute; void* pvData; DWORD cbData; };
+								typedef BOOL(WINAPI* fnSetWindowCompositionAttribute)(HWND, WINCOMPATTRDATA*);
+								fnSetWindowCompositionAttribute pSetWindowCompositionAttribute =
+									(fnSetWindowCompositionAttribute)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetWindowCompositionAttribute");
+								if (pSetWindowCompositionAttribute) {
+									ACCENTPOLICY accent = { (DWORD)accentState, 0, 0, 0 };
+									WINCOMPATTRDATA wca = { 19, &accent, sizeof(accent) }; // WCA_ACCENT_POLICY = 19
+									pSetWindowCompositionAttribute(hwndCur, &wca);
+								}
+								break;
+							}
+							case 5: { // DwmEnableBlurBehindWindow
+								int val = InputBox(hwndCur, L"DwmEnableBlurBehindWindow", L"启用模糊 (0=禁用, 1=启用):", 1);
+								DWM_BLURBEHIND bb = { 1, val != 0, 0, FALSE }; // DWM_ENABLE = 1
+								DwmEnableBlurBehindWindow(hwndCur, &bb);
+								break;
+							}
+							case 6: { // DwmExtendFrameIntoClientArea
+								int margin = InputBox(hwndCur, L"DwmExtendFrameIntoClientArea", L"边框扩展值 (MARGINS, 四个方向相同):\n-1=全部扩展 (玻璃效果延伸到整个窗口)\n0=不扩展 (标准边框)\n>0=指定像素宽度", -1);
+								MARGINS m = { margin, margin, margin, margin };
+								DwmExtendFrameIntoClientArea(hwndCur, &m);
+								break;
+							}
+							case 7: { // DwmSetIconicThumbnail
+								int w = InputBox(hwndCur, L"DwmSetIconicThumbnail - 宽度", L"缩略图宽度:", 160);
+								int h = InputBox(hwndCur, L"DwmSetIconicThumbnail - 高度", L"缩略图高度:", 90);
+								HDC hdcScreen = GetDC(0);
+								HDC hdcMem = CreateCompatibleDC(hdcScreen);
+								HBITMAP hBmp = CreateCompatibleBitmap(hdcScreen, w, h);
+								SelectObject(hdcMem, hBmp);
+								RECT rc = { 0, 0, w, h };
+								FillRect(hdcMem, &rc, (HBRUSH)GetStockObject(WHITE_BRUSH));
+								DwmSetIconicThumbnail(hwndCur, hBmp, 0);
+								DeleteObject(hBmp);
+								DeleteDC(hdcMem);
+								ReleaseDC(0, hdcScreen);
+								break;
+							}
+							case 8: { // DwmSetIconicLivePreviewBitmap
+								int w = InputBox(hwndCur, L"DwmSetIconicLivePreviewBitmap - 宽度", L"预览位图宽度:", 320);
+								int h = InputBox(hwndCur, L"DwmSetIconicLivePreviewBitmap - 高度", L"预览位图高度:", 180);
+								HDC hdcScreen = GetDC(0);
+								HDC hdcMem = CreateCompatibleDC(hdcScreen);
+								HBITMAP hBmp = CreateCompatibleBitmap(hdcScreen, w, h);
+								SelectObject(hdcMem, hBmp);
+								RECT rc = { 0, 0, w, h };
+								FillRect(hdcMem, &rc, (HBRUSH)GetStockObject(WHITE_BRUSH));
+								DwmSetIconicLivePreviewBitmap(hwndCur, hBmp, 0, 0);
+								DeleteObject(hBmp);
+								DeleteDC(hdcMem);
+								ReleaseDC(0, hdcScreen);
+								break;
+							}
+							case 9: // DwmInvalidateIconicBitmaps
+								DwmInvalidateIconicBitmaps(hwndCur);
+								break;
+							}
 						}
 						else if (wparam >= 0xD0000000) {
 							wstring an = wstring(dwmwa_name[wparam - 0xD0000000]);
@@ -1501,7 +1990,7 @@ int main() {
 	nid.uID = 1;
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 	nid.uCallbackMessage = (WM_USER + 1);
-	nid.hIcon = LoadIconW(0, IDI_WINLOGO);
+	nid.hIcon = LoadIconW(0, MAKEINTRESOURCEW(32517)); // IDI_WINLOGO = 32517
 	wcscpy_s(nid.szTip, L"Windows Handle Finder (C++ 版)");
 	Shell_NotifyIconW(0, &nid);
 	if (IsUserAnAdmin()) {

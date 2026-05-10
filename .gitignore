@@ -1,0 +1,24 @@
+# 编译输出
+*.exe
+*.obj
+*.o
+*.lib
+*.pdb
+*.ilk
+
+# VS Code 设置（可选，看个人偏好）
+.vscode/
+
+# Windows 系统文件
+Thumbs.db
+Desktop.ini
+
+# 其他
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.log
+
+aitemp/
+plans/
