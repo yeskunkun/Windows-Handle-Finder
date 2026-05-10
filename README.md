@@ -40,6 +40,20 @@
 这些菜单对应上面的区域。
 注意：熟悉Windows API的人能看懂这些，但是不熟悉的尽量不要接触，__更不要随意修改`Explorer.exe`进程的一些Toast窗口__。
 
+## 编译方法
+
+使用 MinGW-w64 g++ 编译（需要安装 MinGW-w64，并确保 `g++.exe` 在 PATH 中）：
+
+```bash
+g++ -DUNICODE -D_UNICODE -fpermissive -mwindows \
+    -o "SoOldWindowsHandleFinderButItIsAliveOmgWow/SoOldWindowsHandleFinderButItIsAliveOmgWow.exe" \
+    "SoOldWindowsHandleFinderButItIsAliveOmgWow/SoOldWindowsHandleFinderButItIsAliveOmgWow.cpp" \
+    -lgdi32 -lole32 -lshell32 -luuid -loleaut32 -ldwmapi -lshlwapi -luxtheme
+```
+
+如果使用 Visual Studio，直接打开 [`SoOldWindowsHandleFinderButItIsAliveOmgWow.sln`](SoOldWindowsHandleFinderButItIsAliveOmgWow.sln) 解决方案文件编译即可。
+
 ***
 野生坤坤没头像出品，搬运请标明来源！（发布也是！）
+额，2923fzyxfkj，我也改了
 http://www.yeskunkun.cn/
