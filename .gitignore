@@ -19,3 +19,6 @@ Desktop.ini
 *.sdf
 *.opensdf
 *.log
+
+aitemp/
+plans/
